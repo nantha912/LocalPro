@@ -1,10 +1,10 @@
 package com.LocalService.lsp.config; // Make sure this package name is correct
-
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -14,6 +14,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -27,42 +28,33 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // 1. Apply the CORS configuration using the Customizer
+                // 1. Apply CORS configuration
                 .cors(Customizer.withDefaults())
-
                 // 2. Disable CSRF protection for stateless APIs
-                .csrf(csrf -> csrf.disable())
-
-                // 3. Configure authorization rules
-                .authorizeHttpRequests(authz -> authz
-                        // IMPORTANT: Explicitly permit all OPTIONS requests for CORS preflight
-                        .requestMatchers("/api/auth/**", "/api/providers/**").permitAll()
-                        // Require authentication for all other requests
+                .csrf(AbstractHttpConfigurer::disable)
+                // 3. Configure session management to be stateless
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // 4. Set up authorization rules
+                .authorizeHttpRequests(auth -> auth
+                        // Allow all requests to the auth and health endpoints
+                        .requestMatchers("/api/auth/**", "/api/**").permitAll()
+                        // Require authentication for any other request
                         .anyRequest().authenticated()
-                )
-
-                // 4. Set session management to stateless (common for APIs)
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
-
+                );
         return http.build();
     }
 
-    /**
-     * This bean defines the global CORS configuration.
-     * It's now integrated directly into the Spring Security filter chain.
-     */
     @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
+    CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // IMPORTANT: Set the specific origin of your frontend application
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173"));
+        // Allow your frontend domain
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173", "https://taraas.com", "https://www.taraas.com","https://api.taraas.com"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With"));
+        configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
-
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        // Apply this configuration to all endpoints in your application
-        source.registerCorsConfiguration("/**", configuration);
+        source.registerCorsConfiguration("/api/**", configuration);
         return source;
     }
 }
+

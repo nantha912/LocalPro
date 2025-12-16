@@ -22,6 +22,7 @@ public class Provider {
     private String city;
     private String pincode;
     private String locationLink;
+    private String upiId; // e.g., "providername@okaxis"
 
 }
 

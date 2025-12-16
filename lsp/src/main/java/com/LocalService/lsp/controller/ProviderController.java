@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/providers")
@@ -24,14 +25,14 @@ public class ProviderController {
     @Autowired
     private ProviderService providerService;
 
-//    @GetMapping("/search")
-//    public ResponseEntity<List<Provider>> searchProviders(
-//            @RequestParam(required = false) String service,
-//            @RequestParam(required = false) String location) {
-//
-//        List<Provider> providers = providerService.search(service, location);
-//        return ResponseEntity.ok(providers);
-//    }
+    @GetMapping("/{id}")
+    public ResponseEntity<Provider> getProviderById(@PathVariable String id) {
+        Optional<Provider> provider = repository.findById(id);
+
+        return provider.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+
 
 }
 
