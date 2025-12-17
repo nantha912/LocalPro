@@ -5,7 +5,7 @@ import com.LocalService.lsp.repository.ProviderRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-        import java.util.List;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/providers")
@@ -15,18 +15,27 @@ public class ProviderSearchController {
     private ProviderRepository providerRepository;
 
     @GetMapping("/search")
-    public List<Provider> searchProviders(@RequestParam(required = false) String area,
-                                          @RequestParam(required = false) String query) {
-        if ((area == null || area.isBlank()) && (query == null || query.isBlank())) {
+    public List<Provider> searchProviders(@RequestParam(required = false) String service,
+                                          @RequestParam(required = false) String location) {
+
+        // 1. If both are empty, return all providers
+        if ((service == null || service.isBlank()) && (location == null || location.isBlank())) {
             return providerRepository.findAll();
         }
 
-        if (area != null && !area.isBlank() && query != null && !query.isBlank()) {
-            return providerRepository.findByCityIgnoreCaseContainingAndProfessionIgnoreCaseContaining(area, query);
-        } else if (area != null && !area.isBlank()) {
-            return providerRepository.findByCityIgnoreCaseContaining(area);
-        } else {
-            return providerRepository.findByProfessionIgnoreCaseContaining(query);
+        // 2. If both service and location are provided
+        if (service != null && !service.isBlank() && location != null && !location.isBlank()) {
+            return providerRepository.findByServiceCategoryAndLocation(service, location);
+        }
+
+        // 3. If only location is provided
+        else if (location != null && !location.isBlank()) {
+            return providerRepository.findByLocation(location);
+        }
+
+        // 4. If only service is provided
+        else {
+            return providerRepository.findByServiceCategory(service);
         }
     }
 }
