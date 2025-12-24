@@ -7,7 +7,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -18,29 +17,47 @@ public class ProviderService {
     @Autowired
     private ProviderRepository providerRepository;
 
+    /**
+     * Searches for providers using service category and/or location.
+     * Uses fuzzy matching (containing) and ignores case sensitivity.
+     */
     public List<Provider> search(String service, String location) {
-        logger.info("Searching providers with service: '{}' and location: '{}'", service, location);
+        logger.info("=== Service Search Layer Started ===");
+        logger.info("Inputs - service: '{}', location: '{}'", service, location);
 
-        // Case 1: Search by Service AND Location
-        if (service != null && !service.trim().isEmpty() && location != null && !location.trim().isEmpty()) {
-            logger.debug("Executing search by Service AND Location");
-            return providerRepository.findByServiceCategoryAndLocation(service, location);
+        // Normalize inputs: Convert empty strings or whitespace-only strings to null
+        String s = (service != null && !service.isBlank()) ? service.trim() : null;
+        String l = (location != null && !location.isBlank()) ? location.trim() : null;
+
+        List<Provider> results;
+
+        if (s != null && l != null) {
+            logger.info("Executing Combined Fuzzy Search: Service AND Location");
+            results = providerRepository.findByServiceCategoryContainingIgnoreCaseAndLocationContainingIgnoreCase(s, l);
+        } else if (s != null) {
+            logger.info("Executing Fuzzy Search: Service only");
+            results = providerRepository.findByServiceCategoryContainingIgnoreCase(s);
+        } else if (l != null) {
+            logger.info("Executing Fuzzy Search: Location only");
+            results = providerRepository.findByLocationContainingIgnoreCase(l);
+        } else {
+            logger.info("No filters provided. Returning all records from database.");
+            results = providerRepository.findAll();
         }
 
-        // Case 2: Search by Service only
-        if (service != null && !service.trim().isEmpty()) {
-            logger.debug("Executing search by Service only");
-            return providerRepository.findByServiceCategory(service);
-        }
+        logger.info("Database Query Result: Found {} providers matching the criteria.", results.size());
+        logger.info("=== Service Search Layer Finished ===");
 
-        // Case 3: Search by Location only
-        if (location != null && !location.trim().isEmpty()) {
-            logger.debug("Executing search by Location only");
-            return providerRepository.findByLocation(location);
-        }
+        return results;
+    }
 
-        // Case 4: No search terms provided
-        logger.warn("No search terms provided. Returning empty list.");
-        return Collections.emptyList();
+    /**
+     * Search providers by work type (e.g., Remote, On-site).
+     */
+    public List<Provider> findByWorkType(String workType) {
+        if (workType == null || workType.isBlank()) {
+            return providerRepository.findAll();
+        }
+        return providerRepository.findByWorkType(workType);
     }
 }
