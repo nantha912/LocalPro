@@ -12,7 +12,7 @@ public class Provider {
 
     private String customerId;
     private String name;
-    private String serviceCategory; // Matches DB key
+    private String serviceCategory;
     private String description;
     private Double price;
     private String workType;
@@ -24,34 +24,15 @@ public class Provider {
     private String youtubeLink;
     private String twitterLink;
     private String websiteLink;
-    private String location; // Matches DB key
+    private String location;
     private Double latitude;
     private Double longitude;
     private String upiId;
+
+    // Initialized here, but we also handle null-safety in the getter/setter
     private List<String> portfolioPhotos = new ArrayList<>();
 
-    public Provider(String id, String customerId, String name, String serviceCategory, String description, Double price, String workType, String email, String phoneNumber, String whatsappNumber, String instagramLink, String facebookLink, String youtubeLink, String twitterLink, String websiteLink, String location, Double latitude, Double longitude, String upiId, List<String> portfolioPhotos) {
-        this.id = id;
-        this.customerId = customerId;
-        this.name = name;
-        this.serviceCategory = serviceCategory;
-        this.description = description;
-        this.price = price;
-        this.workType = workType;
-        this.email = email;
-        this.phoneNumber = phoneNumber;
-        this.whatsappNumber = whatsappNumber;
-        this.instagramLink = instagramLink;
-        this.facebookLink = facebookLink;
-        this.youtubeLink = youtubeLink;
-        this.twitterLink = twitterLink;
-        this.websiteLink = websiteLink;
-        this.location = location;
-        this.latitude = latitude;
-        this.longitude = longitude;
-        this.upiId = upiId;
-        this.portfolioPhotos = portfolioPhotos;
-    }
+    public Provider() {}
 
     // Getters and Setters
     public String getId() { return id; }
@@ -92,6 +73,16 @@ public class Provider {
     public void setLongitude(Double longitude) { this.longitude = longitude; }
     public String getUpiId() { return upiId; }
     public void setUpiId(String upiId) { this.upiId = upiId; }
-    public List<String> getPortfolioPhotos() { return portfolioPhotos; }
-    public void setPortfolioPhotos(List<String> portfolioPhotos) { this.portfolioPhotos = portfolioPhotos; }
+
+    // FIXED: Null-safe getter to prevent NPEs in the Controller
+    public List<String> getPortfolioPhotos() {
+        if (this.portfolioPhotos == null) {
+            this.portfolioPhotos = new ArrayList<>();
+        }
+        return portfolioPhotos;
+    }
+
+    public void setPortfolioPhotos(List<String> portfolioPhotos) {
+        this.portfolioPhotos = portfolioPhotos;
+    }
 }
