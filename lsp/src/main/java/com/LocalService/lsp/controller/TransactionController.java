@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @RestController
@@ -44,9 +45,18 @@ public class TransactionController {
         if (tx.isPresent()) {
             Transaction t = tx.get();
             t.setStatus("COMPLETED");
-            // Here you would trigger logic to calculate commission later
             return ResponseEntity.ok(transactionRepository.save(t));
         }
         return ResponseEntity.notFound().build();
+    }
+
+    /**
+     * NEW: Fetch all transactions for a specific customer.
+     * This is used by the CustomerProfilePage.
+     */
+    @GetMapping("/customer/{customerId}")
+    public ResponseEntity<List<Transaction>> getTransactionsByCustomer(@PathVariable String customerId) {
+        List<Transaction> list = transactionRepository.findByCustomerId(customerId);
+        return ResponseEntity.ok(list);
     }
 }

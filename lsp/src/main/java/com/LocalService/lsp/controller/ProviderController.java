@@ -3,18 +3,23 @@ package com.LocalService.lsp.controller;
 import com.LocalService.lsp.model.Provider;
 import com.LocalService.lsp.repository.ProviderRepository;
 import com.LocalService.lsp.service.ProviderService;
+import com.LocalService.lsp.service.S3Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
+import java.util.ArrayList;
 
 @RestController
 @RequestMapping("/api/providers")
-@CrossOrigin(origins = "*") // Ensure frontend can access these endpoints
+@CrossOrigin(origins = "*")
 public class ProviderController {
 
     private static final Logger logger = LoggerFactory.getLogger(ProviderController.class);
@@ -25,73 +30,87 @@ public class ProviderController {
     @Autowired
     private ProviderService providerService;
 
+    @Autowired
+    private S3Service s3Service;
+
     /**
-     * Search providers by service and/or location.
-     * This endpoint is required for the SearchResultsPage.jsx frontend.
-     * * NOTE: To resolve the 'Ambiguous mapping' error, ensure that the
-     * redundant 'ProviderSearchController.java' file is DELETED from your project.
+     * Search endpoint - delegates to Service layer for fuzzy matching logic.
      */
     @GetMapping("/search")
     public List<Provider> searchProviders(
             @RequestParam(required = false) String service,
             @RequestParam(required = false) String location) {
-        logger.info("Search Request Received - Service: '{}', Location: '{}'", service, location);
+        logger.info("API Search: service={}, location={}", service, location);
         return providerService.search(service, location);
     }
 
-    /**
-     * Fetch a single provider by their unique ID.
-     * This handles the request from your Profile and Details pages.
-     */
     @GetMapping("/{id}")
     public ResponseEntity<Provider> getProviderById(@PathVariable String id) {
-        logger.info("Request received to fetch provider with ID: {}", id);
-
-        Optional<Provider> providerOpt = repository.findById(id);
-
-        if (providerOpt.isPresent()) {
-            Provider provider = providerOpt.get();
-            logger.info("Found provider: {} for ID: {}", provider.getName(), id);
-            return ResponseEntity.ok(provider);
-        } else {
-            logger.warn("Provider not found with ID: {}", id);
-            return ResponseEntity.notFound().build();
-        }
+        return repository.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
-    /**
-     * Check if a customer is a provider by searching for a Provider record
-     * that matches the given customerId.
-     */
     @GetMapping("/customer/{customerId}")
     public ResponseEntity<Provider> getProviderByCustomerId(@PathVariable String customerId) {
-        logger.info("Checking if Customer ID {} has an associated Provider profile", customerId);
+        return repository.findByCustomerId(customerId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
 
-        // We use Optional<?> to handle potential type inference issues from the repository
-        // and then cast it explicitly to Provider.
-        Optional<?> providerOpt = repository.findByCustomerId(customerId);
-
-        if (providerOpt.isPresent()) {
-            Object result = providerOpt.get();
-            if (result instanceof Provider) {
-                Provider provider = (Provider) result;
-                logger.info("Customer {} is a provider with Provider ID: {}", customerId, provider.getId());
-                return ResponseEntity.ok(provider);
-            }
-        }
-
-        logger.info("Customer {} is not a provider yet.", customerId);
-        return ResponseEntity.notFound().build();
+    @PostMapping
+    public Provider saveProvider(@RequestBody Provider provider) {
+        return repository.save(provider);
     }
 
     /**
-     * Save or Update a provider profile.
+     * Upload a portfolio photo.
+     * Includes null-safety fix for getPortfolioPhotos().
      */
-    @PostMapping
-    public Provider saveProvider(@RequestBody Provider provider) {
-        logger.info("Request received to save provider: {}", provider.getName());
-        Provider savedProvider = repository.save(provider);
-        logger.info("Provider saved successfully with ID: {}", savedProvider.getId());
-        return savedProvider;
+    @PostMapping("/{id}/photos")
+    public ResponseEntity<?> uploadPortfolioPhoto(
+            @PathVariable String id,
+            @RequestParam("file") MultipartFile file) {
+
+        Optional<Provider> providerOpt = repository.findById(id);
+        if (providerOpt.isEmpty()) return ResponseEntity.notFound().build();
+
+        Provider provider = providerOpt.get();
+
+        // Ensure the list is initialized even if the DB record didn't have it
+        if (provider.getPortfolioPhotos() == null) {
+            provider.setPortfolioPhotos(new ArrayList<>());
+        }
+
+        if (provider.getPortfolioPhotos().size() >= 10) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Limit of 10 photos reached.");
+        }
+
+        try {
+            String photoUrl = s3Service.uploadFile(file, id);
+            provider.getPortfolioPhotos().add(photoUrl);
+            repository.save(provider);
+            return ResponseEntity.ok(provider);
+        } catch (IOException e) {
+            logger.error("S3 Upload failed: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @DeleteMapping("/{id}/photos")
+    public ResponseEntity<Provider> deletePortfolioPhoto(
+            @PathVariable String id,
+            @RequestParam("url") String photoUrl) {
+
+        Optional<Provider> providerOpt = repository.findById(id);
+        if (providerOpt.isEmpty()) return ResponseEntity.notFound().build();
+
+        Provider provider = providerOpt.get();
+        if (provider.getPortfolioPhotos() != null && provider.getPortfolioPhotos().remove(photoUrl)) {
+            s3Service.deleteFile(photoUrl);
+            repository.save(provider);
+            return ResponseEntity.ok(provider);
+        }
+        return ResponseEntity.badRequest().build();
     }
 }

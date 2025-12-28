@@ -9,93 +9,51 @@ public class Transaction {
     @Id
     private String id;
     private String providerId;
+    private String providerName;     // Stores name for history
     private String customerId;
     private String serviceId;
+    private String serviceCategory;  // Stores category for history
     private Double amount;
-    private String status; // "INITIATED", "CUSTOMER_CONFIRMED", "PROVIDER_VERIFIED", "COMPLETED"
+    private String status;           // "INITIATED", "CUSTOMER_CONFIRMED", "COMPLETED"
     private LocalDateTime createdAt;
-    private String transactionNote; // Order ID or description
+    private String transactionNote;
+
+    // NEW: Added to fix the 'UnsatisfiedDependencyException' in the Repository
     private boolean billed = false;
 
-    public Transaction(String id, String providerId, String customerId, String serviceId, Double amount, String status, LocalDateTime createdAt, String transactionNote, boolean billed) {
-        this.id = id;
-        this.providerId = providerId;
-        this.customerId = customerId;
-        this.serviceId = serviceId;
-        this.amount = amount;
-        this.status = status;
-        this.createdAt = createdAt;
-        this.transactionNote = transactionNote;
-        this.billed = billed;
-    }
+    public Transaction() {}
 
-    public String getId() {
-        return id;
-    }
+    // Getters and Setters
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
 
-    public String getProviderId() {
-        return providerId;
-    }
+    public String getProviderId() { return providerId; }
+    public void setProviderId(String providerId) { this.providerId = providerId; }
 
-    public String getCustomerId() {
-        return customerId;
-    }
+    public String getProviderName() { return providerName; }
+    public void setProviderName(String providerName) { this.providerName = providerName; }
 
-    public String getServiceId() {
-        return serviceId;
-    }
+    public String getCustomerId() { return customerId; }
+    public void setCustomerId(String customerId) { this.customerId = customerId; }
 
-    public Double getAmount() {
-        return amount;
-    }
+    public String getServiceId() { return serviceId; }
+    public void setServiceId(String serviceId) { this.serviceId = serviceId; }
 
-    public String getStatus() {
-        return status;
-    }
+    public String getServiceCategory() { return serviceCategory; }
+    public void setServiceCategory(String serviceCategory) { this.serviceCategory = serviceCategory; }
 
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
+    public Double getAmount() { return amount; }
+    public void setAmount(Double amount) { this.amount = amount; }
 
-    public String getTransactionNote() {
-        return transactionNote;
-    }
-    public boolean isBilled() {
-        return billed;
-    }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
 
-    public void setId(String id) {
-        this.id = id;
-    }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
-    public void setProviderId(String providerId) {
-        this.providerId = providerId;
-    }
+    public String getTransactionNote() { return transactionNote; }
+    public void setTransactionNote(String transactionNote) { this.transactionNote = transactionNote; }
 
-    public void setCustomerId(String customerId) {
-        this.customerId = customerId;
-    }
-
-    public void setServiceId(String serviceId) {
-        this.serviceId = serviceId;
-    }
-
-    public void setAmount(Double amount) {
-        this.amount = amount;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public void setTransactionNote(String transactionNote) {
-        this.transactionNote = transactionNote;
-    }
-    public void setBilled(boolean billed) {
-        this.billed = billed;
-    }
+    public boolean isBilled() { return billed; }
+    public void setBilled(boolean billed) { this.billed = billed; }
 }
