@@ -3,6 +3,8 @@ package com.LocalService.lsp.config;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -17,57 +19,52 @@ public class S3Config {
 
     private static final Logger logger = LoggerFactory.getLogger(S3Config.class);
 
-    /**
-     * Maps to aws.access-key in your application.properties.
-     * The ':' ensures that if the property is missing, it defaults to an empty string.
-     */
-    @Value("${aws.access-key:}")
+    @Autowired
+    private Environment env;
+
+    @Value("${aws.access-key:${AWS_ACCESS_KEY_ID:${AWS_ACCESS_KEY:}}}")
     private String accessKey;
 
-    /**
-     * Maps to aws.secret-key in your application.properties.
-     */
-    @Value("${aws.secret-key:}")
+    @Value("${aws.secret-key:${AWS_SECRET_ACCESS_KEY:${AWS_SECRET_KEY:}}}")
     private String secretKey;
 
-    /**
-     * Maps to aws.s3.region in your application.properties.
-     */
     @Value("${aws.s3.region:us-east-1}")
     private String region;
 
-    /**
-     * Diagnostic check to verify properties are loaded from application.properties.
-     */
     @PostConstruct
     public void diagnosticCheck() {
-        logger.info("======= AWS S3 Property Check =======");
+        logger.info("======= S3 CREDENTIAL RESOLUTION CHECK =======");
 
-        boolean isAccessKeyPresent = (accessKey != null && !accessKey.isBlank());
-        boolean isSecretKeyPresent = (secretKey != null && !secretKey.isBlank());
+        // Check which specific key was found in the environment
+        String resolvedAccessKeyName = "NONE";
+        if (env.containsProperty("aws.access-key")) resolvedAccessKeyName = "aws.access-key";
+        else if (env.containsProperty("AWS_ACCESS_KEY_ID")) resolvedAccessKeyName = "AWS_ACCESS_KEY_ID";
+        else if (env.containsProperty("AWS_ACCESS_KEY")) resolvedAccessKeyName = "AWS_ACCESS_KEY";
 
-        logger.info("Property [aws.access-key]: {}", isAccessKeyPresent ? "LOADED" : "MISSING");
-        logger.info("Property [aws.secret-key]: {}", isSecretKeyPresent ? "LOADED" : "MISSING");
-        logger.info("Property [aws.s3.region]: {}", region);
-
-        if (!isAccessKeyPresent || !isSecretKeyPresent) {
-            logger.error("!!! ALERT: AWS Credentials are not loaded. Portfolio photo features will fail.");
+        if (accessKey != null && !accessKey.isBlank()) {
+            logger.info("Access Key Status: LOADED");
+            logger.info("Resolved From Source: {}", resolvedAccessKeyName);
+            logger.info("Key Length: {}", accessKey.length());
         } else {
-            logger.info("Status: SUCCESS - S3 Configuration initialized.");
+            logger.error("Access Key Status: NOT FOUND (Empty or Null)");
         }
-        logger.info("=====================================");
+
+        if (secretKey != null && !secretKey.isBlank()) {
+            logger.info("Secret Key Status: LOADED");
+            logger.info("Secret Key Length: {}", secretKey.length());
+        } else {
+            logger.error("Secret Key Status: NOT FOUND");
+        }
+
+        logger.info("Region: {}", region);
+        logger.info("===============================================");
     }
 
-    /**
-     * Factory method for S3Client.
-     * Uses AnonymousCredentialsProvider as a fallback to prevent startup crashes
-     * if the keys in application.properties are blank.
-     */
     @Bean
     public S3Client s3Client() {
         try {
             if (accessKey == null || accessKey.isBlank() || secretKey == null || secretKey.isBlank()) {
-                logger.warn("S3 Credentials are blank. Returning unauthenticated S3Client.");
+                logger.warn("Returning Anonymous S3 Client - Credentials missing.");
                 return S3Client.builder()
                         .region(Region.of(region))
                         .credentialsProvider(AnonymousCredentialsProvider.create())
@@ -81,8 +78,7 @@ public class S3Config {
                     .credentialsProvider(StaticCredentialsProvider.create(credentials))
                     .build();
         } catch (Exception e) {
-            logger.error("Error creating S3Client bean: {}", e.getMessage());
-            // Fallback to allow context to load
+            logger.error("S3 Initialization Error: {}", e.getMessage());
             return S3Client.builder()
                     .region(Region.of(region))
                     .credentialsProvider(AnonymousCredentialsProvider.create())

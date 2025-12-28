@@ -4,21 +4,48 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.LocalDateTime;
 
+/**
+ * Transaction Model
+ * Includes necessary fields for JIT SSE Handshake:
+ * 1. customerName/providerName: Required for attractive real-time alerts.
+ * 2. status: Triggers front-end reactive windows (INITIATED, CUSTOMER_CONFIRMED, COMPLETED).
+ * 3. billed: Supports admin accounting and repository queries.
+ * 4. progress: Added to support visual progress bars in the customer profile page.
+ */
 @Document(collection = "transactions")
 public class Transaction {
     @Id
     private String id;
+
     private String providerId;
-    private String providerName;     // Stores name for history
+    private String providerName;
+
     private String customerId;
+    private String customerName;
+
     private String serviceId;
-    private String serviceCategory;  // Stores category for history
+    private String serviceCategory;
+
     private Double amount;
-    private String status;           // "INITIATED", "CUSTOMER_CONFIRMED", "COMPLETED"
+
+    /**
+     * status transitions:
+     * - INITIATED: Created at start of payment.
+     * - CUSTOMER_CONFIRMED: Triggers the "Payment Received" alert for the Provider.
+     * - COMPLETED: Triggers the "Success/Review" alert for the Customer.
+     */
+    private String status;
+
+    /**
+     * progress (0-100): Used for the visual progress bar in the Customer Profile.
+     * Derived from status or set manually for multi-step services.
+     */
+    private Integer progress = 0;
+
     private LocalDateTime createdAt;
     private String transactionNote;
 
-    // NEW: Added to fix the 'UnsatisfiedDependencyException' in the Repository
+    // Required for findByStatusAndBilledFalse in repository
     private boolean billed = false;
 
     public Transaction() {}
@@ -36,6 +63,9 @@ public class Transaction {
     public String getCustomerId() { return customerId; }
     public void setCustomerId(String customerId) { this.customerId = customerId; }
 
+    public String getCustomerName() { return customerName; }
+    public void setCustomerName(String customerName) { this.customerName = customerName; }
+
     public String getServiceId() { return serviceId; }
     public void setServiceId(String serviceId) { this.serviceId = serviceId; }
 
@@ -47,6 +77,9 @@ public class Transaction {
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+
+    public Integer getProgress() { return progress; }
+    public void setProgress(Integer progress) { this.progress = progress; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
