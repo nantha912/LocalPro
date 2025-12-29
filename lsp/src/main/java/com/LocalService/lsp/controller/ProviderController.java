@@ -15,11 +15,10 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
-import java.util.ArrayList;
 
 @RestController
 @RequestMapping("/api/providers")
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = "*") // Critical: Allows your React frontend to communicate with these endpoints
 public class ProviderController {
 
     private static final Logger logger = LoggerFactory.getLogger(ProviderController.class);
@@ -34,38 +33,85 @@ public class ProviderController {
     private S3Service s3Service;
 
     /**
-     * Search endpoint - delegates to Service layer for fuzzy matching logic.
+     * SEARCH: Consolidated search endpoint.
+     * Handles fuzzy matching for services and locations.
+     * Note: Delete 'ProviderSearchController.java' after implementing this to avoid conflicts.
      */
     @GetMapping("/search")
     public List<Provider> searchProviders(
             @RequestParam(required = false) String service,
             @RequestParam(required = false) String location) {
-        logger.info("API Search: service={}, location={}", service, location);
+        logger.info("Search Request: service='{}', location='{}'", service, location);
         return providerService.search(service, location);
     }
 
+    /**
+     * READ: Fetch a single provider by unique ID.
+     */
     @GetMapping("/{id}")
     public ResponseEntity<Provider> getProviderById(@PathVariable String id) {
+        logger.info("Fetching provider details for ID: {}", id);
         return repository.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    /**
+     * READ: Check if a Customer ID already has a registered Provider profile.
+     */
     @GetMapping("/customer/{customerId}")
     public ResponseEntity<Provider> getProviderByCustomerId(@PathVariable String customerId) {
+        logger.info("Checking provider profile for Customer ID: {}", customerId);
         return repository.findByCustomerId(customerId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    /**
+     * CREATE / UPDATE: Save profile data.
+     * Handles the new List<String> serviceCategory automatically via JSON mapping.
+     */
     @PostMapping
     public Provider saveProvider(@RequestBody Provider provider) {
+        logger.info("Request to save/update provider: {}", provider.getName());
+        // MongoDB automatically updates if the payload contains an 'id'
         return repository.save(provider);
     }
 
     /**
-     * Upload a portfolio photo.
-     * Includes null-safety fix for getPortfolioPhotos().
+     * PHOTO: Upload/Update the main Profile Photo (Avatar).
+     */
+    @PostMapping("/{id}/profile-photo")
+    public ResponseEntity<?> uploadProfilePhoto(
+            @PathVariable String id,
+            @RequestParam("file") MultipartFile file) {
+
+        Optional<Provider> providerOpt = repository.findById(id);
+        if (providerOpt.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Provider not found");
+
+        Provider provider = providerOpt.get();
+
+        try {
+            // Remove previous photo from S3 to save space/costs
+            if (provider.getProfilePhotoUrl() != null) {
+                s3Service.deleteFile(provider.getProfilePhotoUrl());
+            }
+
+            // Upload new file to the 'avatars' folder
+            String photoUrl = s3Service.uploadFile(file, id, "avatars");
+            provider.setProfilePhotoUrl(photoUrl);
+            repository.save(provider);
+
+            logger.info("Profile photo updated for: {}", id);
+            return ResponseEntity.ok(provider);
+        } catch (IOException e) {
+            logger.error("Avatar upload failed for provider {}: ", id, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to upload photo.");
+        }
+    }
+
+    /**
+     * PORTFOLIO: Upload a new portfolio photo.
      */
     @PostMapping("/{id}/photos")
     public ResponseEntity<?> uploadPortfolioPhoto(
@@ -77,40 +123,41 @@ public class ProviderController {
 
         Provider provider = providerOpt.get();
 
-        // Ensure the list is initialized even if the DB record didn't have it
-        if (provider.getPortfolioPhotos() == null) {
-            provider.setPortfolioPhotos(new ArrayList<>());
-        }
-
+        // Limit check
         if (provider.getPortfolioPhotos().size() >= 10) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Limit of 10 photos reached.");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Portfolio limit (10) reached.");
         }
 
         try {
-            String photoUrl = s3Service.uploadFile(file, id);
+            String photoUrl = s3Service.uploadFile(file, id, "portfolio");
             provider.getPortfolioPhotos().add(photoUrl);
             repository.save(provider);
             return ResponseEntity.ok(provider);
         } catch (IOException e) {
-            logger.error("S3 Upload failed: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            logger.error("Portfolio upload failed: ", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Upload failed.");
         }
     }
 
+    /**
+     * PORTFOLIO: Delete a specific portfolio photo.
+     */
     @DeleteMapping("/{id}/photos")
-    public ResponseEntity<Provider> deletePortfolioPhoto(
+    public ResponseEntity<?> deletePortfolioPhoto(
             @PathVariable String id,
-            @RequestParam("url") String photoUrl) {
+            @RequestParam String url) {
 
         Optional<Provider> providerOpt = repository.findById(id);
         if (providerOpt.isEmpty()) return ResponseEntity.notFound().build();
 
         Provider provider = providerOpt.get();
-        if (provider.getPortfolioPhotos() != null && provider.getPortfolioPhotos().remove(photoUrl)) {
-            s3Service.deleteFile(photoUrl);
+
+        if (provider.getPortfolioPhotos().remove(url)) {
+            s3Service.deleteFile(url);
             repository.save(provider);
             return ResponseEntity.ok(provider);
         }
-        return ResponseEntity.badRequest().build();
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Photo URL not found in portfolio.");
     }
 }

@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import javax.security.auth.login.CredentialNotFoundException;
 import java.nio.file.attribute.UserPrincipalNotFoundException;
+import java.util.Optional;
 
 @Service
 public class CustomerService {
@@ -26,21 +27,33 @@ public class CustomerService {
     }
 
     /**
+     * Finds a customer by their unique ID.
+     * Required for displaying profile data when navigating to /customer/:id.
+     * * @param id The unique identifier of the customer.
+     * @return An Optional containing the customer if found.
+     */
+    public Optional<Customer> getCustomerById(String id) {
+        logger.info("Service: Fetching customer by ID: {}", id);
+        return customerRepository.findById(id);
+    }
+
+    /**
      * Registers a new customer.
-     * @param customer The customer object containing name, email, and plain-text password.
+     * Uses existsByEmail for better performance during duplicate checks.
+     * * @param customer The customer object containing name, email, and plain-text password.
      * @return The saved customer object.
      * @throws IllegalStateException if a customer with the same email already exists.
      */
     public Customer registerCustomer(Customer customer) {
         logger.info("Attempting to register customer with email: {}", customer.getEmail());
 
-        // Check if a customer with the email already exists
-        if (customerRepository.findByEmail(customer.getEmail()).isPresent()) {
+        // Optimized check using the existsByEmail method
+        if (customerRepository.existsByEmail(customer.getEmail())) {
             logger.warn("Registration failed: Email {} is already in use.", customer.getEmail());
             throw new IllegalStateException("Error: Email is already in use!");
         }
 
-        // Encode the password before saving
+        // Encode the password before saving for security
         String encodedPassword = passwordEncoder.encode(customer.getPassword());
         customer.setPassword(encodedPassword);
 
@@ -53,7 +66,7 @@ public class CustomerService {
 
     /**
      * Authenticates a customer.
-     * @param email The customer's email.
+     * * @param email The customer's email.
      * @param password The customer's plain-text password.
      * @return The authenticated customer object.
      * @throws UserPrincipalNotFoundException if no user is found with the given email.

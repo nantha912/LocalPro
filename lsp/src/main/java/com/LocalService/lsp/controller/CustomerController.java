@@ -3,6 +3,7 @@ package com.LocalService.lsp.controller;
 import com.LocalService.lsp.model.Customer;
 import com.LocalService.lsp.model.LoginRequest;
 import com.LocalService.lsp.service.CustomerService;
+import com.LocalService.lsp.repository.CustomerRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,63 +14,64 @@ import org.springframework.web.bind.annotation.*;
 import javax.security.auth.login.CredentialNotFoundException;
 import java.nio.file.attribute.UserPrincipalNotFoundException;
 
-// Note: Using a DTO (Data Transfer Object) for the request body is a best practice.
-// For simplicity, this example uses the Customer model directly.
-
 @RestController
-@RequestMapping("/api/auth") // A common base path for authentication-related endpoints
+@RequestMapping("/api/auth")
+@CrossOrigin(origins = "*") // Critical for frontend access
 public class CustomerController {
 
     private static final Logger logger = LoggerFactory.getLogger(CustomerController.class);
 
-    private final CustomerService customerService;
+    @Autowired
+    private CustomerService customerService;
 
     @Autowired
-    public CustomerController(CustomerService customerService) {
-        this.customerService = customerService;
+    private CustomerRepository customerRepository;
+
+    /**
+     * FIX: Added missing endpoint to fetch customer by ID.
+     * This resolves the "Profile Unavailable" issue when clicking names on payment cards.
+     */
+    @GetMapping("/customer/{id}")
+    public ResponseEntity<?> getCustomerById(@PathVariable String id) {
+        logger.info("Fetching public profile for Customer ID: {}", id);
+        return customerRepository.findById(id)
+                .map(customer -> {
+                    customer.setPassword(null); // Security: Hide hashed password
+                    return ResponseEntity.ok(customer);
+                })
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping("/register")
     public ResponseEntity<?> registerCustomer(@RequestBody Customer customer) {
-        logger.info("Request received to register customer with email: {}", customer.getEmail());
         try {
             Customer registeredCustomer = customerService.registerCustomer(customer);
-            // Return the created customer (without the password) and a 201 Created status
-            registeredCustomer.setPassword(null); // Avoid sending the hashed password back
-            logger.info("Customer registered successfully with ID: {}", registeredCustomer.getId());
+            registeredCustomer.setPassword(null);
             return new ResponseEntity<>(registeredCustomer, HttpStatus.CREATED);
         } catch (IllegalStateException e) {
-            logger.warn("Registration failed: Email already in use for email: {}", customer.getEmail());
-            // Return an error response if the email is already in use
             return new ResponseEntity<>(e.getMessage(), HttpStatus.CONFLICT);
         } catch (Exception e) {
-            logger.error("An unexpected error occurred during registration for email: {}", customer.getEmail(), e);
-            // Catch any other potential errors
             return new ResponseEntity<>("An unexpected error occurred.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
+
     @PostMapping("/login")
     public ResponseEntity<?> loginCustomer(@RequestBody LoginRequest loginRequest) {
-        logger.info("Request received to login customer with email: {}", loginRequest.getEmail());
         try {
             Customer customer = customerService.loginCustomer(loginRequest.getEmail(), loginRequest.getPassword());
-            customer.setPassword(null); // Never send the password back to the client
-            logger.info("Customer logged in successfully: {}", customer.getEmail());
+            customer.setPassword(null);
             return ResponseEntity.ok(customer);
         } catch (UserPrincipalNotFoundException e) {
-            logger.warn("Login failed: User not found for email: {}", loginRequest.getEmail());
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.NOT_FOUND); // 404
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.NOT_FOUND);
         } catch (CredentialNotFoundException e) {
-            logger.warn("Login failed: Invalid credentials for email: {}", loginRequest.getEmail());
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.UNAUTHORIZED); // 401
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.UNAUTHORIZED);
         } catch (Exception e) {
-            logger.error("An unexpected error occurred during login for email: {}", loginRequest.getEmail(), e);
             return new ResponseEntity<>("An unexpected error occurred during login.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
+
     @GetMapping("/health")
     public ResponseEntity<String> healthCheck() {
-        logger.info("Health check request received.");
         return ResponseEntity.ok("Healthy");
     }
 }

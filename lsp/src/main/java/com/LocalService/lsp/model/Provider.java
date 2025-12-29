@@ -12,24 +12,32 @@ public class Provider {
 
     private String customerId;
     private String name;
-    private String serviceCategory;
-    private String description;
+
+    // UPDATED: Now storing as a List of strings for multiple categories
+    private List<String> serviceCategory = new ArrayList<>();
+
+    private String description; // Constraints handled at app/validation level (1500 chars)
     private Double price;
     private String workType;
     private String email;
     private String phoneNumber;
     private String whatsappNumber;
+
+    // Social Links
     private String instagramLink;
     private String facebookLink;
     private String youtubeLink;
     private String twitterLink;
     private String websiteLink;
+
     private String location;
     private Double latitude;
     private Double longitude;
     private String upiId;
 
-    // Initialized here, but we also handle null-safety in the getter/setter
+    // New: Specific field for profile photo
+    private String profilePhotoUrl;
+
     private List<String> portfolioPhotos = new ArrayList<>();
 
     public Provider() {}
@@ -41,8 +49,10 @@ public class Provider {
     public void setCustomerId(String customerId) { this.customerId = customerId; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
-    public String getServiceCategory() { return serviceCategory; }
-    public void setServiceCategory(String serviceCategory) { this.serviceCategory = serviceCategory; }
+
+    public List<String> getServiceCategory() { return serviceCategory; }
+    public void setServiceCategory(List<String> serviceCategory) { this.serviceCategory = serviceCategory; }
+
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
     public Double getPrice() { return price; }
@@ -74,15 +84,12 @@ public class Provider {
     public String getUpiId() { return upiId; }
     public void setUpiId(String upiId) { this.upiId = upiId; }
 
-    // FIXED: Null-safe getter to prevent NPEs in the Controller
+    public String getProfilePhotoUrl() { return profilePhotoUrl; }
+    public void setProfilePhotoUrl(String profilePhotoUrl) { this.profilePhotoUrl = profilePhotoUrl; }
+
     public List<String> getPortfolioPhotos() {
-        if (this.portfolioPhotos == null) {
-            this.portfolioPhotos = new ArrayList<>();
-        }
+        if (this.portfolioPhotos == null) this.portfolioPhotos = new ArrayList<>();
         return portfolioPhotos;
     }
-
-    public void setPortfolioPhotos(List<String> portfolioPhotos) {
-        this.portfolioPhotos = portfolioPhotos;
-    }
+    public void setPortfolioPhotos(List<String> portfolioPhotos) { this.portfolioPhotos = portfolioPhotos; }
 }
