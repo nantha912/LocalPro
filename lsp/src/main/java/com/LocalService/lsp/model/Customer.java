@@ -4,6 +4,11 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+/**
+ * Customer Model
+ * Updated to include profilePhotoUrl to persist the user's avatar
+ * uploaded via the Canvas profile page.
+ */
 @Document(collection = "customers")
 public class Customer {
 
@@ -17,7 +22,9 @@ public class Customer {
 
     private String password;
 
-    // Constructors
+    // NEW: Field to store the S3 URL for the profile picture
+    private String profilePhotoUrl;
+
     public Customer() {
     }
 
@@ -58,5 +65,13 @@ public class Customer {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public String getProfilePhotoUrl() {
+        return profilePhotoUrl;
+    }
+
+    public void setProfilePhotoUrl(String profilePhotoUrl) {
+        this.profilePhotoUrl = profilePhotoUrl;
     }
 }

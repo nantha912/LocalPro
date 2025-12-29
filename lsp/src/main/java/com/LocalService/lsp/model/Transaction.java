@@ -23,9 +23,6 @@ public class Transaction {
     private String customerId;
     private String customerName;
 
-    private String serviceId;
-    private String serviceCategory;
-
     private Double amount;
 
     /**
@@ -65,12 +62,6 @@ public class Transaction {
 
     public String getCustomerName() { return customerName; }
     public void setCustomerName(String customerName) { this.customerName = customerName; }
-
-    public String getServiceId() { return serviceId; }
-    public void setServiceId(String serviceId) { this.serviceId = serviceId; }
-
-    public String getServiceCategory() { return serviceCategory; }
-    public void setServiceCategory(String serviceCategory) { this.serviceCategory = serviceCategory; }
 
     public Double getAmount() { return amount; }
     public void setAmount(Double amount) { this.amount = amount; }
