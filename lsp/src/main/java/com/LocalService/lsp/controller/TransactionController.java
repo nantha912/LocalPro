@@ -39,6 +39,7 @@ public class TransactionController {
      */
     @GetMapping(value = "/customer/{customerId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamToCustomer(@PathVariable String customerId) {
+        logger.info("Stream req received from customer");
         SseEmitter emitter = new SseEmitter(1800_000L); // 30-minute timeout
         addEmitter(customerId, emitter);
         emitter.onCompletion(() -> removeEmitter(customerId, emitter));
@@ -48,6 +49,7 @@ public class TransactionController {
 
     @GetMapping(value = "/provider/{providerId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamToProvider(@PathVariable String providerId) {
+        logger.info("Stream req received from customer");
         SseEmitter emitter = new SseEmitter(1800_000L);
         addEmitter(providerId, emitter);
         emitter.onCompletion(() -> removeEmitter(providerId, emitter));
@@ -92,6 +94,7 @@ public class TransactionController {
 
     @PostMapping("/initiate")
     public ResponseEntity<Transaction> initiate(@RequestBody Transaction transaction) {
+        logger.info("payment initiate request received");
         transaction.setStatus("INITIATED");
         transaction.setCreatedAt(LocalDateTime.now());
         transaction.setBilled(false);
