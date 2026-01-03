@@ -4,6 +4,7 @@ import com.LocalService.lsp.model.Transaction;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -17,4 +18,11 @@ public interface TransactionRepository extends MongoRepository<Transaction, Stri
 
     // Find completed but unbilled transactions (for admin billing)
     List<Transaction> findByStatusAndBilledFalse(String status);
+
+    List<Transaction> findByProviderIdAndStatusAndBilledFalseAndCreatedAtBetween(
+            String providerId,
+            String status,
+            LocalDateTime start,
+            LocalDateTime end
+    );
 }
