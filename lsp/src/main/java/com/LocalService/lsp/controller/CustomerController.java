@@ -22,7 +22,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "*") // Critical for frontend access
+@CrossOrigin(origins = "*")
 public class CustomerController {
 
     private static final Logger logger = LoggerFactory.getLogger(CustomerController.class);
@@ -40,6 +40,17 @@ public class CustomerController {
     private S3Service s3Service;
 
     /**
+     * CHECK EXISTENCE: Verifies if an email is already in the database.
+     * This resolves the 404 error in LandingPage.jsx line 109.
+     */
+    @GetMapping("/customer/exists")
+    public ResponseEntity<Boolean> checkIfEmailExists(@RequestParam String email) {
+        logger.info("Checking if email exists: {}", email);
+        boolean exists = customerService.existsByEmail(email);
+        return ResponseEntity.ok(exists);
+    }
+
+    /**
      * FETCH: Get public profile for a customer.
      */
     @GetMapping("/customer/{id}")
@@ -47,40 +58,31 @@ public class CustomerController {
         logger.info("Fetching public profile for Customer ID: {}", id);
         return customerRepository.findById(id)
                 .map(customer -> {
-                    customer.setPassword(null); // Security: Hide hashed password
+                    customer.setPassword(null);
                     return ResponseEntity.ok(customer);
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
 
     /**
-     * PHOTO UPLOAD: Dedicated endpoint to handle profile picture uploads to S3.
-     * This matches the POST request initiated in the Canvas profile page.
+     * PHOTO UPLOAD: Dedicated endpoint for customer profile pictures.
      */
     @PostMapping("/customer/{id}/profile-photo")
     public ResponseEntity<?> uploadCustomerPhoto(
             @PathVariable String id,
             @RequestParam("file") MultipartFile file) {
 
-        logger.info("Profile photo upload request for Customer ID: {}", id);
-
         Optional<Customer> customerOpt = customerRepository.findById(id);
-        if (customerOpt.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found.");
-        }
+        if (customerOpt.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found.");
 
         Customer customer = customerOpt.get();
 
         try {
-            // 1. Delete old photo from S3 if it exists to keep storage clean
             if (customer.getProfilePhotoUrl() != null && !customer.getProfilePhotoUrl().isBlank()) {
                 s3Service.deleteFile(customer.getProfilePhotoUrl());
             }
 
-            // 2. Upload to S3 under 'customer_avatars' folder
             String photoUrl = s3Service.uploadFile(file, id, "customer_avatars");
-
-            // 3. Persist URL to MongoDB
             customer.setProfilePhotoUrl(photoUrl);
             customerRepository.save(customer);
 
@@ -94,32 +96,20 @@ public class CustomerController {
 
     /**
      * UPDATE: Profile details (Name, Photo URL, Password Handshake).
-     * This method supports the metadata changes in the Edit Profile form.
      */
     @PutMapping("/customer/{id}")
     public ResponseEntity<?> updateCustomerProfile(
             @PathVariable String id,
             @RequestBody Map<String, String> updates) {
 
-        logger.info("Metadata update request for customer ID: {}", id);
-
         Optional<Customer> customerOpt = customerRepository.findById(id);
-        if (customerOpt.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found.");
-        }
+        if (customerOpt.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found.");
 
         Customer customer = customerOpt.get();
 
-        // 1. Update basic info
-        if (updates.containsKey("name")) {
-            customer.setName(updates.get("name"));
-        }
+        if (updates.containsKey("name")) customer.setName(updates.get("name"));
+        if (updates.containsKey("profilePhotoUrl")) customer.setProfilePhotoUrl(updates.get("profilePhotoUrl"));
 
-        if (updates.containsKey("profilePhotoUrl")) {
-            customer.setProfilePhotoUrl(updates.get("profilePhotoUrl"));
-        }
-
-        // 2. Handle Password Change Handshake
         if (updates.get("currentPassword") != null && updates.get("newPassword") != null) {
             String currentPassword = updates.get("currentPassword");
             String newPassword = updates.get("newPassword");
@@ -135,7 +125,6 @@ public class CustomerController {
 
         Customer savedCustomer = customerRepository.save(customer);
         savedCustomer.setPassword(null);
-
         return ResponseEntity.ok(savedCustomer);
     }
 
