@@ -38,6 +38,8 @@ public class Transaction {
      * Derived from status or set manually for multi-step services.
      */
     private Integer progress = 0;
+    private String rejectionReason;
+
 
     private LocalDateTime createdAt;
     private String transactionNote;
@@ -48,6 +50,9 @@ public class Transaction {
     public Transaction() {}
 
     // Getters and Setters
+    public String getRejectionReason() { return rejectionReason; }
+    public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
+
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
 

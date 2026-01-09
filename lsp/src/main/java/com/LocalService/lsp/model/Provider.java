@@ -1,44 +1,50 @@
 package com.LocalService.lsp.model;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.GeoSpatialIndexed;
 import org.springframework.data.mongodb.core.mapping.Document;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.ArrayList;
 
+/**
+ * Provider Model - Remote & Hybrid Update
+ */
 @Document(collection = "providers")
 public class Provider {
     @Id
     private String id;
-
     private String customerId;
     private String name;
-
-    // UPDATED: Now storing as a List of strings for multiple categories
     private List<String> serviceCategory = new ArrayList<>();
-
-    private String description; // Constraints handled at app/validation level (1500 chars)
+    private String description;
     private Double price;
     private String workType;
     private String email;
     private String phoneNumber;
     private String whatsappNumber;
+    private String location;
+    private String city;
 
-    // Social Links
+    // NEW: Service Delivery Classification (LOCAL, REMOTE, HYBRID)
+    private String serviceDeliveryType = "LOCAL";
+
+    @GeoSpatialIndexed(type = org.springframework.data.mongodb.core.index.GeoSpatialIndexType.GEO_2DSPHERE)
+    private double[] coordinates; // [longitude, latitude]
+
+    private LocalDateTime lastActive = LocalDateTime.now();
+    private boolean profileComplete = false;
+    private double responseRate = 1.0;
+
+    private String upiId;
+    private String profilePhotoUrl;
+    private List<String> portfolioPhotos = new ArrayList<>();
+
     private String instagramLink;
     private String facebookLink;
     private String youtubeLink;
     private String twitterLink;
     private String websiteLink;
-
-    private String location;
-    private Double latitude;
-    private Double longitude;
-    private String upiId;
-
-    // New: Specific field for profile photo
-    private String profilePhotoUrl;
-
-    private List<String> portfolioPhotos = new ArrayList<>();
 
     public Provider() {}
 
@@ -49,10 +55,10 @@ public class Provider {
     public void setCustomerId(String customerId) { this.customerId = customerId; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
-
     public List<String> getServiceCategory() { return serviceCategory; }
     public void setServiceCategory(List<String> serviceCategory) { this.serviceCategory = serviceCategory; }
-
+    public String getServiceDeliveryType() { return serviceDeliveryType; }
+    public void setServiceDeliveryType(String serviceDeliveryType) { this.serviceDeliveryType = serviceDeliveryType; }
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
     public Double getPrice() { return price; }
@@ -65,6 +71,18 @@ public class Provider {
     public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
     public String getWhatsappNumber() { return whatsappNumber; }
     public void setWhatsappNumber(String whatsappNumber) { this.whatsappNumber = whatsappNumber; }
+    public String getLocation() { return location; }
+    public void setLocation(String location) { this.location = location; }
+    public String getCity() { return city; }
+    public void setCity(String city) { this.city = city; }
+    public double[] getCoordinates() { return coordinates; }
+    public void setCoordinates(double[] coordinates) { this.coordinates = coordinates; }
+    public String getUpiId() { return upiId; }
+    public void setUpiId(String upiId) { this.upiId = upiId; }
+    public String getProfilePhotoUrl() { return profilePhotoUrl; }
+    public void setProfilePhotoUrl(String profilePhotoUrl) { this.profilePhotoUrl = profilePhotoUrl; }
+    public List<String> getPortfolioPhotos() { return portfolioPhotos; }
+    public void setPortfolioPhotos(List<String> portfolioPhotos) { this.portfolioPhotos = portfolioPhotos; }
     public String getInstagramLink() { return instagramLink; }
     public void setInstagramLink(String instagramLink) { this.instagramLink = instagramLink; }
     public String getFacebookLink() { return facebookLink; }
@@ -75,21 +93,4 @@ public class Provider {
     public void setTwitterLink(String twitterLink) { this.twitterLink = twitterLink; }
     public String getWebsiteLink() { return websiteLink; }
     public void setWebsiteLink(String websiteLink) { this.websiteLink = websiteLink; }
-    public String getLocation() { return location; }
-    public void setLocation(String location) { this.location = location; }
-    public Double getLatitude() { return latitude; }
-    public void setLatitude(Double latitude) { this.latitude = latitude; }
-    public Double getLongitude() { return longitude; }
-    public void setLongitude(Double longitude) { this.longitude = longitude; }
-    public String getUpiId() { return upiId; }
-    public void setUpiId(String upiId) { this.upiId = upiId; }
-
-    public String getProfilePhotoUrl() { return profilePhotoUrl; }
-    public void setProfilePhotoUrl(String profilePhotoUrl) { this.profilePhotoUrl = profilePhotoUrl; }
-
-    public List<String> getPortfolioPhotos() {
-        if (this.portfolioPhotos == null) this.portfolioPhotos = new ArrayList<>();
-        return portfolioPhotos;
-    }
-    public void setPortfolioPhotos(List<String> portfolioPhotos) { this.portfolioPhotos = portfolioPhotos; }
 }
