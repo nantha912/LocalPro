@@ -2,6 +2,7 @@ package com.LocalService.lsp.controller;
 
 import com.LocalService.lsp.dto.ProviderSearchResultDTO;
 import com.LocalService.lsp.model.Provider;
+import com.LocalService.lsp.repository.CustomerRepository;
 import com.LocalService.lsp.repository.ProviderRepository;
 import com.LocalService.lsp.service.ProviderService;
 import com.LocalService.lsp.service.S3Service;
@@ -30,6 +31,9 @@ public class ProviderController {
 
     @Autowired
     private ProviderRepository repository;
+
+    @Autowired
+    private CustomerRepository customerRepository;
 
     @Autowired
     private ProviderService providerService;

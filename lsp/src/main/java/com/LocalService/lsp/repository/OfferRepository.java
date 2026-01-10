@@ -9,4 +9,5 @@ import java.util.List;
 public interface OfferRepository extends MongoRepository<Offer, String> {
     List<Offer> findByProviderId(String providerId);
     List<Offer> findByProviderIdAndIsActiveTrue(String providerId);
+    List<Offer> findByIsActiveTrue();
 }

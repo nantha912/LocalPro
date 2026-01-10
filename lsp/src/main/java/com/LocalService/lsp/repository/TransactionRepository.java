@@ -63,4 +63,9 @@ public interface TransactionRepository extends MongoRepository<Transaction, Stri
             LocalDateTime start,
             LocalDateTime end
     );
+    List<Transaction> findByCustomerIdAndStatusAndCreatedAtAfter(
+            String customerId,
+            String status,
+            LocalDateTime createdAt
+    );
 }

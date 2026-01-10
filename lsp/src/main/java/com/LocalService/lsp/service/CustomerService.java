@@ -1,7 +1,9 @@
 package com.LocalService.lsp.service;
 
 import com.LocalService.lsp.model.Customer;
+import com.LocalService.lsp.model.Transaction;
 import com.LocalService.lsp.repository.CustomerRepository;
+import com.LocalService.lsp.repository.TransactionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,6 +12,8 @@ import org.springframework.stereotype.Service;
 
 import javax.security.auth.login.CredentialNotFoundException;
 import java.nio.file.attribute.UserPrincipalNotFoundException;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -18,11 +22,17 @@ public class CustomerService {
     private static final Logger logger = LoggerFactory.getLogger(CustomerService.class);
 
     private final CustomerRepository customerRepository;
+    private final TransactionRepository transactionRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Autowired
-    public CustomerService(CustomerRepository customerRepository, PasswordEncoder passwordEncoder) {
+    public CustomerService(
+            CustomerRepository customerRepository,
+            TransactionRepository transactionRepository,
+            PasswordEncoder passwordEncoder
+    ) {
         this.customerRepository = customerRepository;
+        this.transactionRepository = transactionRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -31,12 +41,15 @@ public class CustomerService {
      */
     public Optional<Customer> getCustomerById(String id) {
         logger.info("Service: Fetching customer by ID: {}", id);
-        return customerRepository.findById(id);
+
+        Optional<Customer> customerOpt = customerRepository.findById(id);
+        customerOpt.ifPresent(this::attachBuyerCategory);
+
+        return customerOpt;
     }
 
     /**
      * Checks if an email is already registered in the system.
-     * Required for frontend pre-registration validation.
      */
     public boolean existsByEmail(String email) {
         return customerRepository.existsByEmail(email);
@@ -53,8 +66,10 @@ public class CustomerService {
             throw new IllegalStateException("Error: Email is already in use!");
         }
 
-        String encodedPassword = passwordEncoder.encode(customer.getPassword());
-        customer.setPassword(encodedPassword);
+        customer.setPassword(passwordEncoder.encode(customer.getPassword()));
+
+        // Default tier
+        customer.setBuyerCategory(Customer.BuyerCategory.NOT_VERIFIED);
 
         Customer savedCustomer = customerRepository.save(customer);
         logger.info("Customer registered successfully with ID: {}", savedCustomer.getId());
@@ -65,7 +80,9 @@ public class CustomerService {
     /**
      * Authenticates a customer.
      */
-    public Customer loginCustomer(String email, String password) throws UserPrincipalNotFoundException, CredentialNotFoundException {
+    public Customer loginCustomer(String email, String password)
+            throws UserPrincipalNotFoundException, CredentialNotFoundException {
+
         logger.info("Attempting to login customer with email: {}", email);
 
         Customer customer = customerRepository.findByEmail(email)
@@ -79,7 +96,56 @@ public class CustomerService {
             throw new CredentialNotFoundException("Wrong password.");
         }
 
+        // 🔥 Compute tier on login
+        attachBuyerCategory(customer);
+
         logger.info("Customer logged in successfully: {}", email);
         return customer;
+    }
+
+    /* =====================================================
+       🔹 TIER COMPUTATION LOGIC (BACKEND SOURCE OF TRUTH)
+       ===================================================== */
+
+    private void attachBuyerCategory(Customer customer) {
+
+        double totalSpent = calculateTotalSpent(customer.getId());
+
+        Customer.BuyerCategory category;
+
+        if (totalSpent >= 100000) {
+            category = Customer.BuyerCategory.GOLD;
+        } else if (totalSpent >= 10000) {
+            category = Customer.BuyerCategory.SILVER;
+        } else if (totalSpent >= 1000) {
+            category = Customer.BuyerCategory.VERIFIED;
+        } else {
+            category = Customer.BuyerCategory.NOT_VERIFIED;
+        }
+
+        customer.setBuyerCategory(category);
+
+        logger.info(
+                "Computed buyer category for customer {} → {} (₹{})",
+                customer.getId(),
+                category,
+                totalSpent
+        );
+    }
+
+    private double calculateTotalSpent(String customerId) {
+
+        LocalDateTime twelveMonthsAgo = LocalDateTime.now().minusMonths(12);
+
+        List<Transaction> completed =
+                transactionRepository.findByCustomerIdAndStatusAndCreatedAtAfter(
+                        customerId,
+                        "COMPLETED",
+                        twelveMonthsAgo
+                );
+
+        return completed.stream()
+                .mapToDouble(t -> t.getAmount() != null ? t.getAmount() : 0)
+                .sum();
     }
 }

@@ -3,6 +3,8 @@ package com.LocalService.lsp.model;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 @Document(collection = "offers")
@@ -25,6 +27,14 @@ public class Offer {
     private boolean isActive = true;
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    private boolean featured = false;     // highlighted offer
+    private List<String> serviceCategory = new ArrayList<>();        // Plumbing, Gardening, etc
+    private String location;
+    private String providerName;
+    private String providerProfilePhoto;
+    private String serviceDeliveryType = "LOCAL";
+
+
     public enum OfferType {
         PERCENTAGE, FLAT, BUY_X_GET_Y, CONDITIONAL, CUSTOM
     }
@@ -43,6 +53,25 @@ public class Offer {
     public Offer() {}
 
     // Getters and Setters
+
+    public String getServiceDeliveryType() {return serviceDeliveryType;}
+
+    public void setServiceDeliveryType(String serviceDeliveryType) {this.serviceDeliveryType = serviceDeliveryType;}
+
+    public String getProviderName() {return providerName;}
+    public void setProviderName(String providerName) {this.providerName = providerName;}
+    public void setProviderProfilePhoto(String providerProfilePhoto) {this.providerProfilePhoto = providerProfilePhoto;}
+
+    public String getProviderProfilePhoto() {return providerProfilePhoto;}
+
+    public boolean isFeatured() {return featured;}
+    public List<String> getServiceCategory() { return serviceCategory; }
+    public String getLocation() {return location;}
+
+    public void setFeatured(boolean featured) {this.featured = featured;}
+    public void setServiceCategory(List<String> serviceCategory) { this.serviceCategory = serviceCategory; }
+    public void setLocation(String location) {this.location = location;}
+
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
     public String getProviderId() { return providerId; }

@@ -1,14 +1,10 @@
 package com.LocalService.lsp.model;
 
 import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-/**
- * Customer Model
- * Updated to include profilePhotoUrl to persist the user's avatar
- * uploaded via the Canvas profile page.
- */
+import java.time.LocalDateTime;
+
 @Document(collection = "customers")
 public class Customer {
 
@@ -16,25 +12,44 @@ public class Customer {
     private String id;
 
     private String name;
-
-    @Indexed(unique = true)
     private String email;
-
     private String password;
-
-    // NEW: Field to store the S3 URL for the profile picture
     private String profilePhotoUrl;
+    private String city;
 
-    public Customer() {
+    /* ==============================
+       🔹 BUYER CATEGORY (NEW)
+       ============================== */
+    private BuyerCategory buyerCategory = BuyerCategory.NOT_VERIFIED;
+
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    /* ==============================
+       🔹 BUYER CATEGORY ENUM
+       ============================== */
+    public enum BuyerCategory {
+        NOT_VERIFIED(0),
+        VERIFIED(1),
+        SILVER(2),
+        GOLD(3);
+
+        private final int rank;
+
+        BuyerCategory(int rank) {
+            this.rank = rank;
+        }
+
+        public int getRank() {
+            return rank;
+        }
     }
 
-    public Customer(String name, String email, String password) {
-        this.name = name;
-        this.email = email;
-        this.password = password;
-    }
+    public Customer() {}
 
-    // Getters and Setters
+    /* ==============================
+       🔹 GETTERS & SETTERS
+       ============================== */
+
     public String getId() {
         return id;
     }
@@ -73,5 +88,29 @@ public class Customer {
 
     public void setProfilePhotoUrl(String profilePhotoUrl) {
         this.profilePhotoUrl = profilePhotoUrl;
+    }
+
+    public String getCity() {
+        return city;
+    }
+
+    public void setCity(String city) {
+        this.city = city;
+    }
+
+    public BuyerCategory getBuyerCategory() {
+        return buyerCategory;
+    }
+
+    public void setBuyerCategory(BuyerCategory buyerCategory) {
+        this.buyerCategory = buyerCategory;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
     }
 }
