@@ -122,6 +122,25 @@ public class TransactionController {
             return ResponseEntity.ok(saved);
         }).orElse(ResponseEntity.notFound().build());
     }
+    @PutMapping("/{id}/reject")
+    public ResponseEntity<Transaction> rejectTransaction(
+            @PathVariable String id,
+            @RequestBody(required = false) Map<String, String> payload
+    ) {
+        return transactionRepository.findById(id).map(t -> {
+            t.setStatus("REJECTED");
+
+            // Optional: store rejection reason (future-proof)
+            if (payload != null && payload.containsKey("reason")) {
+                t.setRejectionReason(payload.get("reason"));
+            }
+
+            Transaction saved = transactionRepository.save(t);
+            broadcast(saved); // 🔔 notify customer in real-time
+            return ResponseEntity.ok(saved);
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
 
     @GetMapping("/customer/{customerId}")
     public List<Transaction> getByCustomer(@PathVariable String customerId) {

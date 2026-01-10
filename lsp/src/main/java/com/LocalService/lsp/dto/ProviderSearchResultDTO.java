@@ -14,4 +14,5 @@ public class ProviderSearchResultDTO extends Provider {
     private long reviewCount;
     private long completedOrders;
     private Double averageRating;
+    private Double searchScore; // Added to capture the final weighted score
 }

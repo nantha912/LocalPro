@@ -7,106 +7,125 @@ import org.bson.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.aggregation.Aggregation;
-import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
-import org.springframework.data.mongodb.core.aggregation.AccumulatorOperators;
-import org.springframework.data.mongodb.core.aggregation.ArrayOperators;
-import org.springframework.data.mongodb.core.aggregation.ComparisonOperators;
+import org.springframework.data.mongodb.core.aggregation.*;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
+/**
+ * ProviderService - City-Centric Ranking Engine
+ * Updates:
+ * 1. Standardized Search: Now specifically targets the 'city' field for geographic filtering.
+ * 2. Mode Separation: Logic splits cleanly between NEARBY (Proximity + Trust) and REMOTE (Global Trust).
+ * 3. Aggregation Logic: Combines GeoJSON coordinates with relational trust data (Reviews/Transactions).
+ */
 @Service
 public class ProviderService {
 
     private static final Logger logger = LoggerFactory.getLogger(ProviderService.class);
 
     @Autowired
-    private ProviderRepository providerRepository;
-
-    @Autowired
     private MongoTemplate mongoTemplate;
 
     /**
-     * Aggregated Search Logic: "Single Trip" Rule
-     * This method calculates average reviews and order counts directly in the DB.
-     * * FIXED: Resolved compilation error "Target type of a lambda conversion must be an interface"
-     * by using the AggregationOperation interface directly for complex $addFields logic.
+     * SEARCH ENGINE v2.1: City-Centric Mode Support
+     * FIXED: Replaced 'location' with 'city' to align with model field standardization.
      */
-    public List<ProviderSearchResultDTO> searchWithMetrics(String service, String location) {
-        logger.info("Aggregated Search Initiated -> service: '{}', location: '{}'", service, location);
+    public List<ProviderSearchResultDTO> searchWithRanking(String service, Double lat, Double lon, String city, String mode) {
+        logger.info("Executing City-Centric Search -> Mode: {}, Service: {}, City: {}", mode, service, city);
 
         List<AggregationOperation> operations = new ArrayList<>();
+        boolean isRemoteMode = "REMOTE".equalsIgnoreCase(mode);
 
-        // 1. BUILD MATCH CRITERIA (Filter providers first to reduce processing load)
-        List<Criteria> criteriaList = new ArrayList<>();
-        if (service != null && !service.isBlank()) {
-            criteriaList.add(Criteria.where("serviceCategory").regex(service.trim(), "i"));
-        }
-        if (location != null && !location.isBlank()) {
-            criteriaList.add(new Criteria().orOperator(
-                    Criteria.where("city").regex(location.trim(), "i"),
-                    Criteria.where("location").regex(location.trim(), "i")
-            ));
-        }
-        if (!criteriaList.isEmpty()) {
-            operations.add(Aggregation.match(new Criteria().andOperator(criteriaList.toArray(new Criteria[0]))));
+        // 1. ELIGIBILITY & PROXIMITY FILTERING
+        if (!isRemoteMode && lat != null && lon != null) {
+            // NEARBY MODE (GPS available): Use $geoNear for distance ranking
+            Document geoQuery = new Document("serviceDeliveryType", new Document("$in", Arrays.asList("LOCAL", "HYBRID")));
+            if (service != null && !service.isBlank()) {
+                geoQuery.append("serviceCategory", new Document("$regex", service.trim()).append("$options", "i"));
+            }
+            // Optional: If a city is also provided, restrict geo search to that city's boundaries
+            if (city != null && !city.isBlank()) {
+                geoQuery.append("city", new Document("$regex", city.trim()).append("$options", "i"));
+            }
+
+            operations.add(new CustomAggregationOperation(new Document("$geoNear", new Document()
+                    .append("near", new Document("type", "Point").append("coordinates", Arrays.asList(lon, lat)))
+                    .append("distanceField", "dist.calculated")
+                    .append("maxDistance", 50000) // 50km radius
+                    .append("spherical", true)
+                    .append("query", geoQuery)
+            )));
+        } else {
+            // REMOTE MODE or NEARBY FALLBACK (Text-based search)
+            Criteria criteria = new Criteria();
+            if (isRemoteMode) {
+                criteria.and("serviceDeliveryType").in("REMOTE", "HYBRID");
+            } else {
+                criteria.and("serviceDeliveryType").in("LOCAL", "HYBRID");
+                // Match against the saved 'city' field specifically
+                if (city != null && !city.isBlank()) {
+                    criteria.and("city").regex(city.trim(), "i");
+                }
+            }
+
+            if (service != null && !service.isBlank()) {
+                criteria.and("serviceCategory").regex(service.trim(), "i");
+            }
+            operations.add(Aggregation.match(criteria));
         }
 
-        // 2. PREPARE ID FOR JOINING
-        // Convert ObjectId _id to String to match 'providerId' in Reviews/Transactions collections
-        operations.add(context -> new Document("$addFields",
-                new Document("idStr", new Document("$toString", "$_id"))));
-
-        // 3. LOOKUP REVIEWS
+        // 2. JOIN TRUST DATA (Reviews & Transactions)
+        operations.add(Aggregation.addFields().addFieldWithValue("idStr", ConvertOperators.ToString.toString("$_id")).build());
         operations.add(Aggregation.lookup("reviews", "idStr", "providerId", "rawReviews"));
-
-        // 4. CALCULATE REVIEW METRICS
-        // FIXED: Using raw AggregationOperation lambda to handle the $ifNull correctly
-        operations.add(context -> new Document("$addFields",
-                new Document("reviewCount", new Document("$size", "$rawReviews"))
-                        .append("averageRating", new Document("$ifNull",
-                                List.of(new Document("$avg", "$rawReviews.rating"), 0.0)))));
-
-        // 5. LOOKUP TRANSACTIONS & COUNT COMPLETED ORDERS
         operations.add(Aggregation.lookup("transactions", "idStr", "providerId", "rawTransactions"));
 
-        // Use standard Spring API for order filtering as it doesn't require a lambda
+        // 3. METRIC CALCULATIONS
         operations.add(Aggregation.addFields()
-                .addFieldWithValue("completedOrders",
-                        ArrayOperators.Size.lengthOfArray(
-                                ArrayOperators.Filter.filter("rawTransactions")
-                                        .as("tx")
-                                        .by(ComparisonOperators.Eq.valueOf("tx.status").equalToValue("COMPLETED"))
-                        )
-                ).build());
+                .addFieldWithValue("reviewCount", ArrayOperators.Size.lengthOfArray("rawReviews"))
+                .addFieldWithValue("averageRating", new Document("$ifNull", Arrays.asList(new Document("$avg", "$rawReviews.rating"), 0.0)))
+                .addFieldWithValue("completedOrders", ArrayOperators.Size.lengthOfArray(
+                        ArrayOperators.Filter.filter("rawTransactions")
+                                .as("tx").by(ComparisonOperators.Eq.valueOf("tx.status").equalToValue("COMPLETED"))))
+                .build());
 
-        // 6. FINAL MAPPING & CLEANUP
-        // Map the internal MongoDB ID to the 'id' field expected by the frontend DTO
-        operations.add(context -> new Document("$addFields", new Document("id", new Document("$toString", "$_id"))));
+        // 4. WEIGHTED SCORING
+        Document scoringFormula = isRemoteMode ?
+                // Remote Scoring: Focus on Ratings (40%) and Volume (30%)
+                new Document("$add", Arrays.asList(
+                        new Document("$multiply", Arrays.asList("$averageRating", 8)),
+                        new Document("$min", Arrays.asList(new Document("$multiply", Arrays.asList("$completedOrders", 0.3)), 30)),
+                        20
+                )) :
+                // Nearby Scoring: Focus on Proximity (30%) and Ratings (30%)
+                new Document("$add", Arrays.asList(
+                        new Document("$multiply", Arrays.asList("$averageRating", 6)),
+                        new Document("$min", Arrays.asList(new Document("$multiply", Arrays.asList("$completedOrders", 0.2)), 20)),
+                        new Document("$cond", Arrays.asList(new Document("$lt", Arrays.asList("$dist.calculated", 5000)), 30, 10)),
+                        20
+                ));
 
-        // Map result to DTO. Fields not in DTO (rawReviews, rawTransactions, idStr) are automatically discarded.
-        operations.add(Aggregation.project(ProviderSearchResultDTO.class));
+        operations.add(Aggregation.addFields().addFieldWithValue("searchScore", scoringFormula).build());
 
-        Aggregation aggregation = Aggregation.newAggregation(operations);
+        // 5. FINAL SORT & CLEANUP
+        operations.add(Aggregation.sort(Sort.Direction.DESC, "searchScore"));
+        operations.add(Aggregation.project().andExclude("rawReviews", "rawTransactions", "idStr"));
+        operations.add(Aggregation.addFields().addFieldWithValue("id", ConvertOperators.ToString.toString("$_id")).build());
 
-        List<ProviderSearchResultDTO> results = mongoTemplate.aggregate(
-                aggregation,
-                "providers",
-                ProviderSearchResultDTO.class
-        ).getMappedResults();
-
-        logger.info("Aggregated search complete. Calculated metrics for {} results.", results.size());
-        return results;
+        return mongoTemplate.aggregate(Aggregation.newAggregation(operations), "providers", ProviderSearchResultDTO.class).getMappedResults();
     }
 
-    public List<Provider> findByWorkType(String workType) {
-        if (workType == null || workType.isBlank()) {
-            return providerRepository.findAll();
-        }
-        return providerRepository.findByWorkType(workType);
+    /**
+     * Custom aggregation class to support complex MongoDB documents like $geoNear
+     */
+    private static class CustomAggregationOperation implements AggregationOperation {
+        private final Document document;
+        public CustomAggregationOperation(Document document) { this.document = document; }
+        @Override public Document toDocument(AggregationOperationContext context) { return document; }
     }
 }
